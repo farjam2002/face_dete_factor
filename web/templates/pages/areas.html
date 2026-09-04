@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+
+{% block content %}
+{% if error %}
+<div class="alert alert-danger">
+    {{ error }}
+</div>
+{% endif %}
+
+{% if success %}
+<div class="alert alert-success">
+    {{ success }}
+</div>
+{% endif %}
+
+<div class="card">
+    <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;">
+        <h1>مدیریت محدوده‌ها</h1>
+        <button class="btn btn-primary" onclick="openCreateModal()">+ افزودن محدوده جدید</button>
+    </div>
+    <p style="color:#6b7280; margin-top:4px;">
+        محدوده‌های فیزیکی مانند ورودی، خط تولید، انبار و غیره را اینجا مدیریت کنید.
+    </p>
+</div>
+
+<div class="card">
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>نام محدوده</th>
+                <th>توضیحات</th>
+                <th>دوربین‌های متصل</th>
+                <th>وضعیت</th>
+                <th>عملیات</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% if area_stats %}
+                {% for item in area_stats %}
+                <tr>
+                    <td>{{ item.area.id }}</td>
+                    <td><strong>{{ item.area.name }}</strong></td>
+                    <td>{{ item.area.description or '—' }}</td>
+                    <td>{{ item.camera_count }} دوربین</td>
+                    <td>
+                        {% if item.area.is_active %}
+                            <span class="badge badge-success">فعال</span>
+                        {% else %}
+                            <span class="badge badge-muted">غیرفعال</span>
+                        {% endif %}
+                    </td>
+                    <td class="actions-cell">
+                        <button class="btn btn-small" onclick='openEditModal({{ item.area.id|tojson }}, {{ item.area.name|tojson }}, {{ item.area.description|tojson }}, {{ item.area.is_active|tojson }})'>ویرایش</button>
+                        <form method="post" action="/areas/{{ item.area.id }}/toggle" style="display:inline;">
+                            <button type="submit" class="btn btn-small btn-secondary">
+                                {% if item.area.is_active %}غیرفعال{% else %}فعال{% endif %}
+                            </button>
+                        </form>
+                        <form method="post" action="/areas/{{ item.area.id }}/delete" style="display:inline;" onsubmit="return confirm('آیا از حذف این محدوده مطمئن هستید؟');">
+                            <button type="submit" class="btn btn-small btn-danger">حذف</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            {% else %}
+                <tr><td colspan="6" style="text-align:center; color:#6b7280;">هنوز محدوده‌ای تعریف نشده است.</td></tr>
+            {% endif %}
+        </tbody>
+    </table>
+</div>
+
+<!-- Modal افزودن/ویرایش -->
+<div class="modal" id="areaModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 id="modalTitle">افزودن محدوده</h3>
+            <button class="btn-close" onclick="closeModal()">&times;</button>
+        </div>
+        <form id="areaForm" method="post">
+            <div class="form-group">
+                <label>نام محدوده *</label>
+                <input type="text" name="name" id="areaName" required maxlength="100">
+            </div>
+            <div class="form-group">
+                <label>توضیحات</label>
+                <textarea name="description" id="areaDescription" rows="3" maxlength="500"></textarea>
+            </div>
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" name="is_active" id="areaIsActive" checked>
+                    فعال
+                </label>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeModal()">انصراف</button>
+                <button type="submit" class="btn btn-primary">ذخیره</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    function openCreateModal() {
+        document.getElementById('modalTitle').textContent = 'افزودن محدوده جدید';
+        document.getElementById('areaForm').action = '/areas/';
+        document.getElementById('areaName').value = '';
+        document.getElementById('areaDescription').value = '';
+        document.getElementById('areaIsActive').checked = true;
+        document.getElementById('areaModal').style.display = 'flex';
+    }
+
+    function openEditModal(id, name, description, isActive) {
+        document.getElementById('modalTitle').textContent = 'ویرایش محدوده';
+        document.getElementById('areaForm').action = '/areas/' + id + '/edit';
+        document.getElementById('areaName').value = name || '';
+        document.getElementById('areaDescription').value = description || '';
+        document.getElementById('areaIsActive').checked = !!isActive;
+        document.getElementById('areaModal').style.display = 'flex';
+    }
+
+    function closeModal() {
+        document.getElementById('areaModal').style.display = 'none';
+    }
+
+    window.onclick = function(event) {
+        const modal = document.getElementById('areaModal');
+        if (event.target === modal) {
+            closeModal();
+        }
+    }
+</script>
+{% endblock %}

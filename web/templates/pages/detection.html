@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="card">
+    <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;">
+        <h1>تشخیص زنده چهره</h1>
+        <div style="display:flex; gap:10px; align-items:center;">
+            <label>دوربین:</label>
+            <select id="cameraSelect" onchange="changeCamera()">
+                {% for cam in cameras %}
+                    <option value="{{ cam.id }}">{{ cam.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+    </div>
+    <p class="text-muted" style="margin-top:4px;">
+        این صفحه چهره‌های شناسایی‌شده را به صورت زنده نمایش می‌دهد.
+    </p>
+</div>
+
+<div class="card text-center">
+    <img id="liveImage" src="" alt="تصویر زنده"
+        style="max-width:100%; border-radius:8px; background:#1f2937; min-height:300px;">
+    <div id="noCameraMessage" style="display:none; padding:40px; color:#6b7280;">
+        دوربین فعالی وجود ندارد. ابتدا یک دوربین اضافه و فعال کنید.
+    </div>
+</div>
+
+<script>
+    let refreshInterval = null;
+    
+    function changeCamera() {
+        startDetection();
+    }
+    
+    function startDetection() {
+        const cameraId = document.getElementById('cameraSelect').value;
+        const img = document.getElementById('liveImage');
+        const noCamMsg = document.getElementById('noCameraMessage');
+        
+        if (!cameraId) {
+            img.style.display = 'none';
+            noCamMsg.style.display = 'block';
+            return;
+        }
+        
+        img.style.display = 'block';
+        noCamMsg.style.display = 'none';
+        
+        if (refreshInterval) clearInterval(refreshInterval);
+        
+        function refresh() {
+            const newSrc = `/detection/${cameraId}/live?ts=${Date.now()}`;
+            const testImg = new Image();
+            testImg.onload = function() {
+                img.src = newSrc;
+            };
+            testImg.src = newSrc;
+        }
+        
+        refresh();
+        refreshInterval = setInterval(refresh, 1500);
+    }
+    
+    window.addEventListener('beforeunload', function() {
+        if (refreshInterval) clearInterval(refreshInterval);
+    });
+    
+    startDetection();
+</script>
+
+{% endblock %}

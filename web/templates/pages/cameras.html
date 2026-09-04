@@ -1,0 +1,277 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+{% if error %}
+<div class="alert alert-danger">{{ error }}</div>
+{% endif %}
+
+{% if success %}
+<div class="alert alert-success">{{ success }}</div>
+{% endif %}
+
+<div class="card">
+    <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;">
+        <h1>مدیریت دوربین‌ها</h1>
+        <button class="btn btn-primary" onclick="openCreateModal()">+ افزودن دوربین جدید</button>
+    </div>
+    <p class="text-muted" style="margin-top:4px;">
+        دوربین‌های RTSP و وبکم را اینجا مدیریت کنید و به محدوده‌های مختلف متصل کنید.
+    </p>
+</div>
+
+<div class="card">
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>نام دوربین</th>
+                <th>آدرس منبع</th>
+                <th>محدوده</th>
+                <th>وضعیت</th>
+                <th>آخرین تصویر و آمار</th>
+                <th>عملیات</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% if camera_list %}
+                {% for item in camera_list %}
+                <tr data-camera-id="{{ item.camera.id }}">
+                    <td>{{ item.camera.id }}</td>
+                    <td>
+                        <strong>{{ item.camera.name }}</strong>
+                        {% if not item.camera.is_active %}
+                            <span class="text-muted" style="font-size:12px;">(غیرفعال)</span>
+                        {% endif %}
+                    </td>
+                    <td style="font-family:monospace; font-size:12px; word-break:break-all; max-width:180px;">
+                        {{ item.camera.rtsp_url }}
+                    </td>
+                    <td>{{ item.area_name }}</td>
+                    <td>
+                        {% if item.camera.status == 'online' %}
+                            <span class="badge badge-success">آنلاین</span>
+                        {% elif item.camera.status == 'connecting' %}
+                            <span class="badge badge-warning">در حال اتصال</span>
+                        {% elif item.camera.status == 'error' %}
+                            <span class="badge badge-danger" title="{{ item.camera.last_error or 'خطای نامشخص' }}">خطا</span>
+                        {% elif item.camera.status == 'disabled' %}
+                            <span class="badge badge-muted">غیرفعال</span>
+                        {% else %}
+                            <span class="badge badge-info">آفلاین</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <div style="display:flex; gap:10px; align-items:flex-start;">
+                            <!-- تصویر دوربین -->
+                            <div class="frame-container" style="position:relative; width:120px; height:90px; flex-shrink:0;">
+                                <img
+                                    class="camera-frame"
+                                    data-camera-id="{{ item.camera.id }}"
+                                    src="/cameras/{{ item.camera.id }}/frame"
+                                    alt="فریم دوربین"
+                                    style="
+                                        width:120px;
+                                        height:90px;
+                                        object-fit:cover;
+                                        border-radius:6px;
+                                        background:#e5e7eb;
+                                        display:block;
+                                    "
+                                    onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
+                                >
+                                <div class="frame-placeholder"
+                                    style="
+                                        display:none;
+                                        width:120px;
+                                        height:90px;
+                                        border-radius:6px;
+                                        background:#f3f4f6;
+                                        align-items:center;
+                                        justify-content:center;
+                                        color:#9ca3af;
+                                        font-size:11px;
+                                        text-align:center;
+                                        flex-direction:column;
+                                        gap:4px;
+                                    ">
+                                    <span style="font-size:20px;">📷</span>
+                                    <span>بدون تصویر</span>
+                                </div>
+                            </div>
+                            
+                            <!-- آمار -->
+                            <div style="font-size:12px;">
+                                {% if item.stats %}
+                                    <div class="text-muted">
+                                        <strong>فریم:</strong> <span data-stat="frames_read_{{ item.camera.id }}">{{ item.stats.frames_read }}</span>
+                                    </div>
+                                    <div class="text-muted">
+                                        <strong>پردازش:</strong> <span data-stat="frames_processed_{{ item.camera.id }}">{{ item.stats.frames_processed }}</span>
+                                    </div>
+                                    <div class="text-muted">
+                                        <strong>حرکت:</strong> <span data-stat="faces_detected_{{ item.camera.id }}">{{ item.stats.faces_detected }}</span>
+                                    </div>
+                                {% else %}
+                                    <span class="text-muted">—</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </td>
+                    <td class="actions-cell">
+                        <!-- دکمه ماسک -->
+                        <a href="/cameras/{{ item.camera.id }}/mask/edit" class="btn btn-small btn-success">
+                            ماسک
+                        </a>
+                        <!-- دکمه ویرایش -->
+                        <button class="btn btn-small"
+                            onclick="openEditModal({
+                                id: {{ item.camera.id }},
+                                name: '{{ item.camera.name | e }}',
+                                rtsp_url: '{{ item.camera.rtsp_url | e }}',
+                                area_id: {{ item.camera.area_id or 'null' }},
+                                is_active: {{ item.camera.is_active | tojson }}
+                            })">
+                            ویرایش
+                        </button>
+                        <!-- دکمه فعال/غیرفعال -->
+                        <form method="post" action="/cameras/{{ item.camera.id }}/toggle" style="display:inline;">
+                            <button type="submit" class="btn btn-small btn-secondary">
+                                {% if item.camera.is_active %}غیرفعال{% else %}فعال{% endif %}
+                            </button>
+                        </form>
+                        <!-- دکمه حذف -->
+                        <form method="post" action="/cameras/{{ item.camera.id }}/delete" style="display:inline;"
+                            onsubmit="return confirm('آیا از حذف دوربین «{{ item.camera.name }}» مطمئن هستید؟');">
+                            <button type="submit" class="btn btn-small btn-danger">حذف</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            {% else %}
+                <tr>
+                    <td colspan="7" style="text-align:center; color:#6b7280; padding:30px;">
+                        هنوز دوربینی تعریف نشده است.
+                    </td>
+                </tr>
+            {% endif %}
+        </tbody>
+    </table>
+</div>
+
+<!-- Modal افزودن/ویرایش -->
+<div class="modal" id="cameraModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 id="modalTitle">افزودن دوربین</h3>
+            <button class="btn-close" onclick="closeModal()">&times;</button>
+        </div>
+        <form id="cameraForm" method="post">
+            <div class="form-group">
+                <label>نام دوربین *</label>
+                <input type="text" name="name" id="cameraName" required maxlength="100"
+                    placeholder="مثال: دوربین ورودی اصلی">
+            </div>
+            <div class="form-group">
+                <label>آدرس منبع *</label>
+                <input type="text" name="rtsp_url" id="cameraRtspUrl" required
+                    placeholder="rtsp://... یا webcam:0 یا 0">
+                <small class="text-muted" style="font-size:11px; display:block; margin-top:4px;">
+                    برای وبکم لپتاپ: <code>webcam:0</code> یا <code>0</code> | 
+                    برای RTSP: <code>rtsp://ip:port/path</code>
+                </small>
+            </div>
+            <div class="form-group">
+                <label>محدوده متصل</label>
+                <select name="area_id" id="cameraAreaId">
+                    <option value="">— بدون محدوده —</option>
+                    {% for area in areas %}
+                        <option value="{{ area.id }}">{{ area.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" name="is_active" id="cameraIsActive" checked>
+                    فعال
+                </label>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeModal()">انصراف</button>
+                <button type="submit" class="btn btn-primary">ذخیره</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    const areas = {{ areas | tojson }};
+
+    function openCreateModal() {
+        document.getElementById('modalTitle').textContent = 'افزودن دوربین جدید';
+        document.getElementById('cameraForm').action = '/cameras/';
+        document.getElementById('cameraName').value = '';
+        document.getElementById('cameraRtspUrl').value = '';
+        document.getElementById('cameraAreaId').value = '';
+        document.getElementById('cameraIsActive').checked = true;
+        document.getElementById('cameraModal').style.display = 'flex';
+    }
+
+    function openEditModal(camera) {
+        document.getElementById('modalTitle').textContent = 'ویرایش دوربین: ' + camera.name;
+        document.getElementById('cameraForm').action = '/cameras/' + camera.id + '/edit';
+        document.getElementById('cameraName').value = camera.name || '';
+        document.getElementById('cameraRtspUrl').value = camera.rtsp_url || '';
+        document.getElementById('cameraAreaId').value = camera.area_id || '';
+        document.getElementById('cameraIsActive').checked = !!camera.is_active;
+        document.getElementById('cameraModal').style.display = 'flex';
+    }
+
+    function closeModal() {
+        document.getElementById('cameraModal').style.display = 'none';
+    }
+
+    window.onclick = function(event) {
+        const modal = document.getElementById('cameraModal');
+        if (event.target === modal) {
+            closeModal();
+        }
+    }
+
+    // ============ رفرش زنده تصاویر دوربین‌ها ============
+    function refreshCameraFrames() {
+        const frames = document.querySelectorAll('.camera-frame');
+        const timestamp = Date.now();
+        
+        frames.forEach(img => {
+            const cameraId = img.getAttribute('data-camera-id');
+            const newSrc = `/cameras/${cameraId}/frame?ts=${timestamp}`;
+            
+            // استفاده از Image جدید برای تست قبل از اعمال
+            const testImg = new Image();
+            testImg.onload = function() {
+                img.src = newSrc;
+                img.style.display = 'block';
+                if (img.nextElementSibling) {
+                    img.nextElementSibling.style.display = 'none';
+                }
+            };
+            testImg.onerror = function() {
+                // خطا - placeholder نمایش داده شود
+                img.style.display = 'none';
+                if (img.nextElementSibling) {
+                    img.nextElementSibling.style.display = 'flex';
+                }
+            };
+            testImg.src = newSrc;
+        });
+    }
+
+    // رفرش هر ۲ ثانیه
+    setInterval(refreshCameraFrames, 2000);
+
+    // رفرش اولیه بعد از ۱ ثانیه
+    setTimeout(refreshCameraFrames, 1000);
+</script>
+
+{% endblock %}

@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="card">
+    <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;">
+        <div>
+            <h1>📈 گزارش حضور و غیاب</h1>
+            <p class="text-muted" style="margin-top:4px;">
+                مشاهده و فیلتر کردن حضورهای ثبت شده
+            </p>
+        </div>
+        <button class="btn btn-primary" onclick="loadReport()">🔄 به‌روزرسانی</button>
+    </div>
+</div>
+
+<!-- فیلترها -->
+<div class="card">
+    <h3>🔍 فیلترها</h3>
+    <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end;">
+        <div>
+            <label>از تاریخ</label>
+            <input type="date" id="startDate" class="form-control">
+        </div>
+        <div>
+            <label>تا تاریخ</label>
+            <input type="date" id="endDate" class="form-control">
+        </div>
+        <div>
+            <label>کارمند</label>
+            <select id="employeeFilter" class="form-control">
+                <option value="">همه</option>
+                {% for emp in employees %}
+                    <option value="{{ emp.id }}">{{ emp.full_name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label>نوع</label>
+            <select id="personTypeFilter" class="form-control">
+                <option value="">همه</option>
+                <option value="employee">کارمند</option>
+                <option value="unknown">ناشناس</option>
+                <option value="temporary">موقت</option>
+            </select>
+        </div>
+        <div>
+            <label>وضعیت</label>
+            <select id="statusFilter" class="form-control">
+                <option value="">همه</option>
+                <option value="active">فعال</option>
+                <option value="closed">بسته شده</option>
+            </select>
+        </div>
+        <button class="btn btn-success" onclick="loadReport()">اعمال فیلتر</button>
+    </div>
+</div>
+
+<!-- نتایج -->
+<div class="card">
+    <h3>📋 نتایج (<span id="resultCount">0</span>)</h3>
+    <div id="resultsList">در حال بارگذاری...</div>
+</div>
+
+<script>
+async function loadReport() {
+    const startDate = document.getElementById('startDate').value;
+    const endDate = document.getElementById('endDate').value;
+    const employeeId = document.getElementById('employeeFilter').value;
+    const personType = document.getElementById('personTypeFilter').value;
+    const status = document.getElementById('statusFilter').value;
+    
+    const resultsList = document.getElementById('resultsList');
+    resultsList.innerHTML = '<p class="text-muted">در حال بارگذاری...</p>';
+    
+    try {
+        let url = '/reports/sessions?';
+        if (startDate) url += `start_date=${startDate}&`;
+        if (endDate) url += `end_date=${endDate}&`;
+        if (employeeId) url += `employee_id=${employeeId}&`;
+        if (personType) url += `person_type=${personType}&`;
+        if (status) url += `status=${status}&`;
+        
+        const response = await fetch(url);
+        const data = await response.json();
+        
+        document.getElementById('resultCount').textContent = data.count;
+        
+        if (data.count === 0) {
+            resultsList.innerHTML = '<p class="text-muted">هیچ نتیجه‌ای یافت نشد.</p>';
+            return;
+        }
+        
+        let html = `<table class="data-table">
+            <tr>
+                <th>نام</th>
+                <th>نوع</th>
+                <th>ورود</th>
+                <th>خروج</th>
+                <th>مدت</th>
+                <th>وضعیت</th>
+                <th>اطمینان</th>
+            </tr>`;
+        
+        data.sessions.forEach(s => {
+            const typeBadge = s.person_type === 'employee' ? 'badge-success' : 'badge-warning';
+            const typeName = s.person_type === 'employee' ? 'کارمند' : 'ناشناس';
+            
+            const firstSeen = s.first_seen ? new Date(s.first_seen).toLocaleString('fa-IR') : '—';
+            const endedAt = s.ended_at ? new Date(s.ended_at).toLocaleString('fa-IR') : '—';
+            const duration = Math.floor(s.duration_seconds / 60) + ' دقیقه';
+            const conf = s.confidence ? (s.confidence * 100).toFixed(0) + '%' : '—';
+            const statusBadge = s.status === 'active' ? 'badge-info' : 'badge-muted';
+            const statusName = s.status === 'active' ? 'فعال' : 'بسته شده';
+            
+            html += `<tr>
+                <td><strong>${s.person_name}</strong></td>
+                <td><span class="badge ${typeBadge}">${typeName}</span></td>
+                <td>${firstSeen}</td>
+                <td>${endedAt}</td>
+                <td>${duration}</td>
+                <td><span class="badge ${statusBadge}">${statusName}</span></td>
+                <td>${conf}</td>
+            </tr>`;
+        });
+        
+        html += '</table>';
+        resultsList.innerHTML = html;
+        
+    } catch (error) {
+        resultsList.innerHTML = `<div class="alert alert-danger">خطا: ${error.message}</div>`;
+    }
+}
+
+// بارگذاری اولیه
+loadReport();
+</script>
+
+{% endblock %}

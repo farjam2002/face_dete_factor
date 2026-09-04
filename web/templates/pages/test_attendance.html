@@ -1,0 +1,254 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="card">
+    <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;">
+        <div>
+            <h1>🧪 تست جامع حضور و غیاب</h1>
+            <p class="text-muted">این صفحه وضعیت کامل سیستم را به صورت زنده نمایش می‌دهد.</p>
+        </div>
+        <button class="btn btn-primary" onclick="refreshAll()">🔄 به‌روزرسانی</button>
+    </div>
+</div>
+
+<!-- خلاصه وضعیت -->
+<div class="card">
+    <h2>📊 خلاصه وضعیت</h2>
+    <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap:12px;">
+        <div class="stat-card" style="padding:16px; background:#f0f9ff; border-radius:8px;">
+            <div class="stat-label">🎥 دوربین‌ها</div>
+            <div class="stat-value"><span id="activeCameras">-</span> / <span id="totalCameras">-</span></div>
+            <small class="text-muted">فعال / کل</small>
+        </div>
+        
+        <div class="stat-card" style="padding:16px; background:#fef3c7; border-radius:8px;">
+            <div class="stat-label">👥 کارکنان</div>
+            <div class="stat-value"><span id="activeEmployees">-</span> / <span id="totalEmployees">-</span></div>
+            <small class="text-muted">فعال / کل</small>
+        </div>
+        
+        <div class="stat-card" style="padding:16px; background:#dcfce7; border-radius:8px;">
+            <div class="stat-label">✅ جلسات فعال</div>
+            <div class="stat-value" id="activeSessions">-</div>
+            <small class="text-muted">در حال حضور</small>
+        </div>
+        
+        <div class="stat-card" style="padding:16px; background:#e5e7eb; border-radius:8px;">
+            <div class="stat-label">📋 sightings اخیر</div>
+            <div class="stat-value" id="recentSightings">-</div>
+            <small class="text-muted">آخرین ۱ ساعت</small>
+        </div>
+    </div>
+</div>
+
+<!-- موتور تشخیص -->
+<div class="card">
+    <h2>🤖 موتور تشخیص</h2>
+    <table class="data-table">
+        <tr>
+            <th>بخش</th>
+            <th>وضعیت</th>
+        </tr>
+        <tr>
+            <td><strong>Face Detector</strong></td>
+            <td id="detectorMode">-</td>
+        </tr>
+        <tr>
+            <td><strong>Face Engine</strong></td>
+            <td id="engineMode">-</td>
+        </tr>
+    </table>
+</div>
+
+<!-- دوربین‌های فعال -->
+<div class="card">
+    <h2>📹 دوربین‌های فعال</h2>
+    <div id="camerasList">در حال بارگذاری...</div>
+</div>
+
+<!-- تست زنده -->
+<div class="card">
+    <h2>🎯 تست زنده تشخیص</h2>
+    <div style="margin-bottom:16px;">
+        <label>انتخاب دوربین: </label>
+        <select id="cameraSelect" onchange="captureFrame()">
+            <option value="">-- انتخاب کنید --</option>
+        </select>
+        <button class="btn btn-success" onclick="captureFrame()" style="margin-right:12px;">📸 گرفتن فریم</button>
+    </div>
+    
+    <div id="liveTestResult" style="text-align:center;">
+        <p class="text-muted">یک دوربین انتخاب کنید و روی "گرفتن فریم" کلیک کنید.</p>
+    </div>
+</div>
+
+<!-- جلسات فعال -->
+<div class="card">
+    <h2>🟢 جلسات فعال</h2>
+    <div id="activeSessionsList">در حال بارگذاری...</div>
+</div>
+
+<!-- sightings اخیر -->
+<div class="card">
+    <h2>📋 sightings اخیر</h2>
+    <div id="sightingsList">در حال بارگذاری...</div>
+</div>
+
+<script>
+async function refreshAll() {
+    await loadStatus();
+}
+
+async function loadStatus() {
+    try {
+        const response = await fetch('/test/attendance/status');
+        const data = await response.json();
+        
+        // خلاصه
+        document.getElementById('totalCameras').textContent = data.summary.total_cameras;
+        document.getElementById('activeCameras').textContent = data.summary.active_cameras;
+        document.getElementById('totalEmployees').textContent = data.summary.total_employees;
+        document.getElementById('activeEmployees').textContent = data.summary.active_employees;
+        document.getElementById('activeSessions').textContent = data.summary.active_sessions;
+        document.getElementById('recentSightings').textContent = data.summary.recent_sightings;
+        
+        // موتور تشخیص
+        document.getElementById('detectorMode').innerHTML = 
+            `<span class="badge ${data.face_detector_mode === 'ultraface' ? 'badge-success' : 'badge-warning'}">${data.face_detector_mode.toUpperCase()}</span>`;
+        document.getElementById('engineMode').innerHTML = 
+            `<span class="badge ${data.face_engine_mode === 'lbph' ? 'badge-success' : 'badge-info'}">${data.face_engine_mode.toUpperCase()}</span>`;
+        
+        // دوربین‌ها
+        const camerasList = document.getElementById('camerasList');
+        if (data.cameras.length === 0) {
+            camerasList.innerHTML = '<p class="text-muted">هیچ دوربین فعالی وجود ندارد.</p>';
+        } else {
+            let html = '<table class="data-table"><tr><th>نام</th><th>محدوده</th><th>وضعیت</th><th>در حال اجرا</th></tr>';
+            data.cameras.forEach(cam => {
+                html += `<tr>
+                    <td><strong>${cam.name}</strong></td>
+                    <td>${cam.area_name || '—'}</td>
+                    <td><span class="badge ${cam.status === 'online' ? 'badge-success' : 'badge-warning'}">${cam.status}</span></td>
+                    <td>${cam.is_running ? '✅ بله' : '❌ خیر'}</td>
+                </tr>`;
+            });
+            html += '</table>';
+            camerasList.innerHTML = html;
+        }
+        
+        // پر کردن select دوربین‌ها
+        const cameraSelect = document.getElementById('cameraSelect');
+        cameraSelect.innerHTML = '<option value="">-- انتخاب کنید --</option>';
+        data.cameras.forEach(cam => {
+            cameraSelect.innerHTML += `<option value="${cam.id}">${cam.name}</option>`;
+        });
+        
+        // جلسات فعال
+        const sessionsList = document.getElementById('activeSessionsList');
+        if (data.active_sessions.length === 0) {
+            sessionsList.innerHTML = '<p class="text-muted">هیچ جلسه فعالی وجود ندارد. چهره‌ای جلوی دوربین بگیرید!</p>';
+        } else {
+            let html = '<table class="data-table"><tr><th>ID</th><th>نوع</th><th>نام</th><th>مدت (ثانیه)</th><th>اطمینان</th></tr>';
+            data.active_sessions.forEach(s => {
+                html += `<tr>
+                    <td>${s.id}</td>
+                    <td><span class="badge ${s.person_type === 'employee' ? 'badge-success' : 'badge-warning'}">${s.person_type}</span></td>
+                    <td>${s.employee_name || s.track_id}</td>
+                    <td>${s.duration_seconds}s</td>
+                    <td>${s.confidence ? s.confidence.toFixed(2) : '-'}</td>
+                </tr>`;
+            });
+            html += '</table>';
+            sessionsList.innerHTML = html;
+        }
+        
+        // sightings اخیر
+        const sightingsList = document.getElementById('sightingsList');
+        if (data.recent_sightings.length === 0) {
+            sightingsList.innerHTML = '<p class="text-muted">هنوز sighting ثبت نشده است.</p>';
+        } else {
+            let html = '<table class="data-table"><tr><th>زمان</th><th>نوع</th><th>نام</th><th>اطمینان</th><th>موقعیت</th></tr>';
+            data.recent_sightings.forEach(s => {
+                const time = s.seen_at ? new Date(s.seen_at).toLocaleTimeString('fa-IR') : '-';
+                html += `<tr>
+                    <td>${time}</td>
+                    <td><span class="badge ${s.person_type === 'employee' ? 'badge-success' : 'badge-warning'}">${s.person_type}</span></td>
+                    <td>${s.employee_name || '-'}</td>
+                    <td>${s.confidence ? s.confidence.toFixed(2) : '-'}</td>
+                    <td style="font-family:monospace; font-size:11px;">${s.bbox || '-'}</td>
+                </tr>`;
+            });
+            html += '</table>';
+            sightingsList.innerHTML = html;
+        }
+        
+    } catch (error) {
+        console.error('Error loading status:', error);
+    }
+}
+
+async function captureFrame() {
+    const cameraId = document.getElementById('cameraSelect').value;
+    const resultDiv = document.getElementById('liveTestResult');
+    
+    if (!cameraId) {
+        resultDiv.innerHTML = '<div class="alert alert-warning">لطفاً یک دوربین انتخاب کنید.</div>';
+        return;
+    }
+    
+    resultDiv.innerHTML = '<div class="alert alert-info">⏳ در حال پردازش...</div>';
+    
+    try {
+        const response = await fetch(`/test/attendance/live-frame/${cameraId}`);
+        const data = await response.json();
+        
+        let html = `
+            <div style="margin-bottom:16px;">
+                <img src="data:image/jpeg;base64,${data.image}" 
+                     style="max-width:100%; border-radius:8px; border:2px solid #d1d5db;">
+            </div>
+            <div class="grid" style="grid-template-columns: repeat(3, 1fr); gap:12px;">
+                <div style="padding:12px; background:#f9fafb; border-radius:8px;">
+                    <div class="stat-label">چهره‌های تشخیص</div>
+                    <div class="stat-value">${data.faces_count}</div>
+                </div>
+                <div style="padding:12px; background:#dcfce7; border-radius:8px;">
+                    <div class="stat-label">قابل استفاده</div>
+                    <div class="stat-value">${data.usable_faces}</div>
+                </div>
+                <div style="padding:12px; background:#dbeafe; border-radius:8px;">
+                    <div class="stat-label">هویت شناسایی</div>
+                    <div class="stat-value">${data.identity_results.length}</div>
+                </div>
+            </div>
+        `;
+        
+        if (data.identity_results.length > 0) {
+            html += '<div style="margin-top:16px;"><h4>هویت‌های شناسایی شده:</h4><ul>';
+            data.identity_results.forEach(r => {
+                html += `<li><strong>${r.label}</strong> (${r.person_type})</li>`;
+            });
+            html += '</ul></div>';
+        } else {
+            html += '<div class="alert alert-warning" style="margin-top:16px;">هیچ چهره‌ای شناسایی نشد.</div>';
+        }
+        
+        resultDiv.innerHTML = html;
+        
+        // به‌روزرسانی وضعیت بعد از گرفتن فریم
+        setTimeout(loadStatus, 1000);
+        
+    } catch (error) {
+        resultDiv.innerHTML = `<div class="alert alert-danger">خطا: ${error.message}</div>`;
+    }
+}
+
+// بارگذاری اولیه
+loadStatus();
+
+// به‌روزرسانی خودکار هر ۵ ثانیه
+setInterval(loadStatus, 5000);
+</script>
+
+{% endblock %}

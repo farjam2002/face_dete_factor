@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="card">
+    <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;">
+        <div>
+            <h1>📊 داشبورد</h1>
+            <p class="text-muted" style="margin-top:4px;">
+                وضعیت زنده سیستم حضور و غیاب
+            </p>
+        </div>
+        <div style="display:flex; gap:8px; align-items:center;">
+            <span class="badge badge-success" id="lastUpdate">در حال بارگذاری...</span>
+            <button class="btn btn-secondary" onclick="refreshDashboard()">🔄 به‌روزرسانی</button>
+        </div>
+    </div>
+</div>
+
+<!-- آمار کلی -->
+<div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap:12px; margin-bottom:16px;">
+    <div class="card" style="padding:16px; background:#f0f9ff; border-radius:8px;">
+        <div class="stat-label">🎥 دوربین‌ها</div>
+        <div class="stat-value"><span id="activeCameras">-</span> / <span id="totalCameras">-</span></div>
+        <small class="text-muted">فعال / کل</small>
+    </div>
+    
+    <div class="card" style="padding:16px; background:#fef3c7; border-radius:8px;">
+        <div class="stat-label">👥 کارکنان</div>
+        <div class="stat-value"><span id="activeEmployees">-</span> / <span id="totalEmployees">-</span></div>
+        <small class="text-muted">فعال / کل</small>
+    </div>
+    
+    <div class="card" style="padding:16px; background:#fee2e2; border-radius:8px;">
+        <div class="stat-label">👤 ناشناس‌ها</div>
+        <div class="stat-value" id="totalUnknowns">-</div>
+        <small class="text-muted">ثبت شده</small>
+    </div>
+    
+    <div class="card" style="padding:16px; background:#dcfce7; border-radius:8px;">
+        <div class="stat-label">✅ جلسات فعال</div>
+        <div class="stat-value" id="activeSessions">-</div>
+        <small class="text-muted">در حال حضور</small>
+    </div>
+    
+    <div class="card" style="padding:16px; background:#e5e7eb; border-radius:8px;">
+        <div class="stat-label">📅 جلسات امروز</div>
+        <div class="stat-value" id="sessionsToday">-</div>
+        <small class="text-muted">از ابتدای روز</small>
+    </div>
+</div>
+
+<!-- دوربین‌ها -->
+<div class="card">
+    <h2>📹 دوربین‌های فعال</h2>
+    <div id="camerasList">در حال بارگذاری...</div>
+</div>
+
+<!-- حضورهای اخیر -->
+<div class="card">
+    <h2>🕐 حضورهای اخیر</h2>
+    <div id="recentSessionsList">در حال بارگذاری...</div>
+</div>
+
+<script>
+let refreshInterval = null;
+
+async function refreshDashboard() {
+    try {
+        const response = await fetch('/api/dashboard/live');
+        const data = await response.json();
+        
+        // آمار کلی
+        document.getElementById('totalCameras').textContent = data.stats.total_cameras;
+        document.getElementById('activeCameras').textContent = data.stats.active_cameras;
+        document.getElementById('totalEmployees').textContent = data.stats.total_employees;
+        document.getElementById('activeEmployees').textContent = data.stats.active_employees;
+        document.getElementById('totalUnknowns').textContent = data.stats.total_unknowns;
+        document.getElementById('activeSessions').textContent = data.stats.active_sessions;
+        document.getElementById('sessionsToday').textContent = data.stats.sessions_today;
+        
+        // زمان به‌روزرسانی
+        document.getElementById('lastUpdate').textContent = 
+            `آخرین به‌روزرسانی: ${new Date().toLocaleTimeString('fa-IR')}`;
+        
+        // دوربین‌ها
+        const camerasList = document.getElementById('camerasList');
+        if (data.cameras.length === 0) {
+            camerasList.innerHTML = '<p class="text-muted">هیچ دوربین فعالی وجود ندارد.</p>';
+        } else {
+            let html = '<table class="data-table"><tr><th>نام</th><th>محدوده</th><th>وضعیت</th><th>در حال اجرا</th></tr>';
+            data.cameras.forEach(cam => {
+                const statusBadge = cam.status === 'online' ? 'badge-success' : 'badge-warning';
+                html += `<tr>
+                    <td><strong>${cam.name}</strong></td>
+                    <td>${cam.area_name}</td>
+                    <td><span class="badge ${statusBadge}">${cam.status}</span></td>
+                    <td>${cam.is_running ? '✅ بله' : '❌ خیر'}</td>
+                </tr>`;
+            });
+            html += '</table>';
+            camerasList.innerHTML = html;
+        }
+        
+        // حضورهای اخیر
+        const recentList = document.getElementById('recentSessionsList');
+        if (data.recent_sessions.length === 0) {
+            recentList.innerHTML = '<p class="text-muted">هنوز حضور ثبت نشده است.</p>';
+        } else {
+            let html = '<table class="data-table"><tr><th>نام</th><th>نوع</th><th>ورود</th><th>خروج</th><th>مدت</th><th>اطمینان</th></tr>';
+            data.recent_sessions.forEach(s => {
+                const typeBadge = s.person_type === 'employee' ? 'badge-success' : 'badge-warning';
+                const typeName = s.person_type === 'employee' ? 'کارمند' : 'ناشناس';
+                const duration = Math.floor(s.duration_seconds / 60) + ' دقیقه';
+                const conf = s.confidence ? (s.confidence * 100).toFixed(0) + '%' : '—';
+                
+                html += `<tr>
+                    <td><strong>${s.person_name}</strong></td>
+                    <td><span class="badge ${typeBadge}">${typeName}</span></td>
+                    <td>${s.first_seen}</td>
+                    <td>${s.last_seen}</td>
+                    <td>${duration}</td>
+                    <td>${conf}</td>
+                </tr>`;
+            });
+            html += '</table>';
+            recentList.innerHTML = html;
+        }
+        
+    } catch (error) {
+        console.error('Error loading dashboard:', error);
+    }
+}
+
+// بارگذاری اولیه
+refreshDashboard();
+
+// به‌روزرسانی خودکار هر ۵ ثانیه
+refreshInterval = setInterval(refreshDashboard, 5000);
+
+// پاک‌سازی هنگام خروج از صفحه
+window.addEventListener('beforeunload', function() {
+    if (refreshInterval) clearInterval(refreshInterval);
+});
+</script>
+
+{% endblock %}

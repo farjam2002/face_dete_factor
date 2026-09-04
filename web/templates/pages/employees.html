@@ -1,0 +1,193 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+{% if error %}
+<div class="alert alert-danger">{{ error }}</div>
+{% endif %}
+
+{% if success %}
+<div class="alert alert-success">{{ success }}</div>
+{% endif %}
+
+<div class="card">
+    <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;">
+        <h1>مدیریت کارکنان</h1>
+        <button class="btn btn-primary" onclick="openCreateModal()">+ افزودن کارمند جدید</button>
+    </div>
+    <p class="text-muted" style="margin-top:4px;">
+        کارکنان را ثبت کنید و تصاویر چهره آن‌ها را برای تشخیص آپلود کنید.
+    </p>
+</div>
+
+<div class="card">
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>کد پرسنلی</th>
+                <th>نام و نام خانوادگی</th>
+                <th>تعداد چهره‌ها</th>
+                <th>وضعیت</th>
+                <th>عملیات</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% if employee_list %}
+                {% for item in employee_list %}
+                <tr>
+                    <td>{{ item.employee.id }}</td>
+                    <td><code>{{ item.employee.personnel_code }}</code></td>
+                    <td><strong>{{ item.employee.full_name }}</strong></td>
+                    <td>
+                        {% if item.face_count > 0 %}
+                            <span class="badge badge-success">{{ item.face_count }} چهره</span>
+                        {% else %}
+                            <span class="badge badge-warning">بدون چهره</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if item.employee.is_active %}
+                            <span class="badge badge-success">فعال</span>
+                        {% else %}
+                            <span class="badge badge-muted">غیرفعال</span>
+                        {% endif %}
+                    </td>
+                    <td class="actions-cell">
+                        <button class="btn btn-small btn-success"
+                            onclick="openUploadModal({{ item.employee.id }}, '{{ item.employee.full_name | e }}')">
+                            آپلود چهره
+                        </button>
+                        <button class="btn btn-small"
+                            onclick="openEditModal({
+                                id: {{ item.employee.id }},
+                                personnel_code: '{{ item.employee.personnel_code | e }}',
+                                full_name: '{{ item.employee.full_name | e }}',
+                                is_active: {{ item.employee.is_active | tojson }}
+                            })">
+                            ویرایش
+                        </button>
+                        <form method="post" action="/employees/{{ item.employee.id }}/toggle" style="display:inline;">
+                            <button type="submit" class="btn btn-small btn-secondary">
+                                {% if item.employee.is_active %}غیرفعال{% else %}فعال{% endif %}
+                            </button>
+                        </form>
+                        <form method="post" action="/employees/{{ item.employee.id }}/delete" style="display:inline;"
+                            onsubmit="return confirm('آیا از حذف «{{ item.employee.full_name }}» مطمئن هستید؟');">
+                            <button type="submit" class="btn btn-small btn-danger">حذف</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            {% else %}
+                <tr>
+                    <td colspan="6" style="text-align:center; color:#6b7280; padding:30px;">
+                        هنوز کارمندی ثبت نشده است.
+                    </td>
+                </tr>
+            {% endif %}
+        </tbody>
+    </table>
+</div>
+
+<!-- Modal افزودن/ویرایش کارمند -->
+<div class="modal" id="employeeModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 id="modalTitle">افزودن کارمند</h3>
+            <button class="btn-close" onclick="closeEmployeeModal()">&times;</button>
+        </div>
+        <form id="employeeForm" method="post">
+            <div class="form-group">
+                <label>کد پرسنلی *</label>
+                <input type="text" name="personnel_code" id="personnelCode" required maxlength="50"
+                    placeholder="مثال: 1001">
+            </div>
+            <div class="form-group">
+                <label>نام و نام خانوادگی *</label>
+                <input type="text" name="full_name" id="fullName" required maxlength="200"
+                    placeholder="مثال: علی محمدی">
+            </div>
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" name="is_active" id="employeeIsActive" checked>
+                    فعال
+                </label>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeEmployeeModal()">انصراف</button>
+                <button type="submit" class="btn btn-primary">ذخیره</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal آپلود چهره -->
+<div class="modal" id="uploadModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>آپلود تصویر چهره</h3>
+            <button class="btn-close" onclick="closeUploadModal()">&times;</button>
+        </div>
+        <p class="text-muted">
+            کارمند: <strong id="uploadEmployeeName"></strong>
+        </p>
+        <form id="uploadForm" method="post" enctype="multipart/form-data">
+            <div class="form-group">
+                <label>انتخاب تصویر *</label>
+                <input type="file" name="file" id="faceFile" accept="image/*" required>
+                <small class="text-muted" style="font-size:11px; display:block; margin-top:4px;">
+                    برای دقت بهتر، چند تصویر با زاویه‌های مختلف از چهره آپلود کنید.
+                </small>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeUploadModal()">انصراف</button>
+                <button type="submit" class="btn btn-primary">آپلود</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    function openCreateModal() {
+        document.getElementById('modalTitle').textContent = 'افزودن کارمند جدید';
+        document.getElementById('employeeForm').action = '/employees/';
+        document.getElementById('personnelCode').value = '';
+        document.getElementById('fullName').value = '';
+        document.getElementById('employeeIsActive').checked = true;
+        document.getElementById('employeeModal').style.display = 'flex';
+    }
+
+    function openEditModal(employee) {
+        document.getElementById('modalTitle').textContent = 'ویرایش کارمند';
+        document.getElementById('employeeForm').action = '/employees/' + employee.id + '/edit';
+        document.getElementById('personnelCode').value = employee.personnel_code || '';
+        document.getElementById('fullName').value = employee.full_name || '';
+        document.getElementById('employeeIsActive').checked = !!employee.is_active;
+        document.getElementById('employeeModal').style.display = 'flex';
+    }
+
+    function closeEmployeeModal() {
+        document.getElementById('employeeModal').style.display = 'none';
+    }
+
+    function openUploadModal(employeeId, employeeName) {
+        document.getElementById('uploadForm').action = '/employees/' + employeeId + '/face/upload';
+        document.getElementById('uploadEmployeeName').textContent = employeeName;
+        document.getElementById('faceFile').value = '';
+        document.getElementById('uploadModal').style.display = 'flex';
+    }
+
+    function closeUploadModal() {
+        document.getElementById('uploadModal').style.display = 'none';
+    }
+
+    window.onclick = function(event) {
+        const employeeModal = document.getElementById('employeeModal');
+        const uploadModal = document.getElementById('uploadModal');
+        if (event.target === employeeModal) closeEmployeeModal();
+        if (event.target === uploadModal) closeUploadModal();
+    }
+</script>
+
+{% endblock %}

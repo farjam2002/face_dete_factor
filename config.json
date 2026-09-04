@@ -1,0 +1,36 @@
+{
+  "app": {
+    "host": "0.0.0.0",
+    "port": 8000,
+    "debug": false,
+    "data_dir": "data"
+  },
+  "storage": {
+    "db_file": "db/app.db",
+    "images_dir": "images",
+    "logs_dir": "logs",
+    "backups_dir": "backups"
+  },
+  "cameras": {
+    "frame_queue_size": 30,
+    "reconnect_delay_seconds": 5,
+    "process_every_n_frames": 3,
+    "save_last_frame": true
+  },
+  "processing": {
+    "downscale_width": 640,
+    "motion_detection_enabled": true,
+    "min_motion_area": 500
+  },
+  "attendance": {
+    "session_close_timeout_seconds": 180,
+    "duplicate_event_interval_seconds": 10,
+    "unknown_stable_min_frames": 5,
+    "reidentification_interval_seconds": 20
+  },
+  "recognition": {
+    "high_confidence_threshold": 0.72,
+    "low_confidence_threshold": 0.45,
+    "use_onnx_if_available": true
+  }
+}

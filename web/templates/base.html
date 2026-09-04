@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }} | سیستم حضور و غیاب</title>
+    <link rel="stylesheet" href="/static/css/app.css">
+</head>
+<body>
+<header class="topbar">
+    <div class="brand">سیستم حضور و غیاب</div>
+    <nav class="menu">
+        <a href="/" class="{% if active_page == 'dashboard' %}active{% endif %}">داشبورد</a>
+        <a href="/detection/" class="{% if active_page == 'detection' %}active{% endif %}">تشخیص زنده</a>
+        <a href="/cameras/" class="{% if active_page == 'cameras' %}active{% endif %}">دوربین‌ها</a>
+        <a href="/areas/" class="{% if active_page == 'areas' %}active{% endif %}">محدوده‌ها</a>
+        <a href="/employees/" class="{% if active_page == 'employees' %}active{% endif %}">کارکنان</a>
+        <a href="/unknowns/" class="{% if active_page == 'unknowns' %}active{% endif %}">ناشناس‌ها</a>
+        <a href="/test/attendance" class="{% if active_page == 'test' %}active{% endif %}">🧪 تست</a>
+    </nav>
+</header>
+
+<main class="container">
+    {% block content %}{% endblock %}
+</main>
+
+</body>
+</html>

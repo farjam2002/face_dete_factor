@@ -1,0 +1,19 @@
+# Web Framework
+fastapi==0.115.0
+uvicorn[standard]==0.32.0
+jinja2==3.1.4
+python-multipart==0.0.12
+
+# Database
+sqlalchemy==2.0.36
+
+# Image Processing & AI
+opencv-contrib-python==5.0.0.93
+numpy==2.5.2
+onnxruntime==1.29.0
+
+# Optional (برای تشخیص چهره با MediaPipe)
+# mediapipe==1.0.1
+
+# Utilities
+python-dateutil==2.9.0
